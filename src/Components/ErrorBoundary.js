@@ -1,7 +1,7 @@
 "use client";
 
 import { Component } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/Components/ui/button";
 
 export class ErrorBoundary extends Component {
   constructor(props) {
