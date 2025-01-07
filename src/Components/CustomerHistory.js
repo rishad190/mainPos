@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/Components/ui/table";
-import { Card } from "@/Components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import {
   Receipt,
   Calendar,
@@ -30,6 +30,7 @@ import {
   CreditCard,
   Download,
   Printer,
+  ArrowRight,
 } from "lucide-react";
 import { ErrorBoundary } from "@/Components/ErrorBoundary";
 import { Input } from "@/Components/ui/input";
@@ -421,57 +422,61 @@ const CustomerHistory = ({ customerId }) => {
         }
       `}</style>
 
-      <div className="print-section">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Purchase History</h3>
-        </div>
-        <div className="overflow-auto rounded-md border bg-white">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="whitespace-nowrap">Memo #</TableHead>
-                <TableHead className="min-w-[200px]">Products</TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Total
-                </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Paid
-                </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Credit
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{dateUtils.formatDate(item.date)}</TableCell>
-                  <TableCell>{item.memoNumber}</TableCell>
-                  <TableCell>{(item.productNames || []).join(", ")}</TableCell>
-                  <TableCell className="text-right">
-                    ${(item.totalPrice || 0).toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    ${(item.givenMoney || 0).toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={`font-medium ${
-                        (item.credit || 0) > 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      ${(item.credit || 0).toFixed(2)}
-                    </span>
-                  </TableCell>
+      <Card>
+        <CardHeader>
+          <CardTitle>Purchase History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="whitespace-nowrap">Date</TableHead>
+                  <TableHead className="whitespace-nowrap">Memo #</TableHead>
+                  <TableHead className="min-w-[200px]">Products</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Total
+                  </TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Paid
+                  </TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Credit
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {currentItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{dateUtils.formatDate(item.date)}</TableCell>
+                    <TableCell>{item.memoNumber}</TableCell>
+                    <TableCell>
+                      {(item.productNames || []).join(", ")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ${(item.totalPrice || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ${(item.givenMoney || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span
+                        className={`font-medium ${
+                          (item.credit || 0) > 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        ${(item.credit || 0).toFixed(2)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="print-section mt-8">
         <h3 className="text-lg font-semibold mb-4">Payment History</h3>
