@@ -26,8 +26,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+} from "@/Components/ui/select";
+import { Label } from "@/Components/ui/label";
 import {
   Pagination,
   PaginationContent,
