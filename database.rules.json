@@ -1,0 +1,40 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "memos": {
+      ".indexOn": ["createdAt", "customerPhone", "date", "totalBill"],
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".validate": "newData.hasChildren(['customerName', 'customerPhone', 'products'])",
+      "products": {
+        ".validate": "newData.isArray() && newData.hasChildren(['name', 'quantity', 'price'])"
+      }
+    },
+    "customers": {
+      ".indexOn": ["name", "phone"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "products": {
+      ".indexOn": ["name"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "cashEntries": {
+      ".indexOn": ["date", "createdAt"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "transactions": {
+      ".indexOn": ["date", "createdAt"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "customerPayments": {
+      ".indexOn": ["customerPhone", "date", "createdAt"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+} 
