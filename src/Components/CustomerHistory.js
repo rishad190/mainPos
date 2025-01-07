@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/Components/ui/table";
-import { Card, CardContent } from "@/Components/ui/card";
+import { Card } from "@/Components/ui/card";
 import {
   Receipt,
   Calendar,
