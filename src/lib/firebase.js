@@ -1,26 +1,25 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCN33Ef3xx3PZyu1F-pvSyRYWlFt28YD_g",
-  authDomain: "possoftware-93abe.firebaseapp.com",
-  databaseURL: "https://possoftware-93abe-default-rtdb.firebaseio.com",
-  projectId: "possoftware-93abe",
-  storageBucket: "possoftware-93abe.appspot.com",
-  messagingSenderId: "1070673846419",
-  appId: "1:1070673846419:web:2d6698e1a5dba120176d66",
-  measurementId: "G-BXSFDXQ6P4",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with persistence
-
-export const auth = getAuth(app);
+// Get Firebase services
 export const db = getDatabase(app);
+export const auth = getAuth(app);
+
+// Add error handling
+if (!app) {
+  throw new Error("Firebase app failed to initialize");
+}
