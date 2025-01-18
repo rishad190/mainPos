@@ -306,7 +306,7 @@ export default function CashManagementPage() {
             <span className="text-gray-500">Today Balance: </span>
             {entries.length > 0 && (
               <span
-                className={`${
+                className={`text-lg font-semibold ${
                   calculateDayTotal(
                     entries,
                     new Date().toISOString().split("T")[0]
@@ -314,22 +314,33 @@ export default function CashManagementPage() {
                     calculateDayTotal(
                       entries,
                       new Date().toISOString().split("T")[0]
-                    ).cashOut >=
+                    ).cashOut >
                   0
                     ? "text-green-600"
                     : "text-red-600"
                 }`}
               >
-                $
-                {(
+                {calculateDayTotal(
+                  entries,
+                  new Date().toISOString().split("T")[0]
+                ).cashIn -
+                  calculateDayTotal(
+                    entries,
+                    new Date().toISOString().split("T")[0]
+                  ).cashOut >
+                0
+                  ? "+"
+                  : "-"}
+                ৳
+                {Math.abs(
                   calculateDayTotal(
                     entries,
                     new Date().toISOString().split("T")[0]
                   ).cashIn -
-                  calculateDayTotal(
-                    entries,
-                    new Date().toISOString().split("T")[0]
-                  ).cashOut
+                    calculateDayTotal(
+                      entries,
+                      new Date().toISOString().split("T")[0]
+                    ).cashOut
                 ).toFixed(2)}
               </span>
             )}
@@ -478,11 +489,14 @@ export default function CashManagementPage() {
             <Input
               id="amount"
               type="number"
+              placeholder="৳0.00"
               value={newEntry.amount}
               onChange={(e) =>
-                setNewEntry({ ...newEntry, amount: parseFloat(e.target.value) })
+                setNewEntry((prev) => ({
+                  ...prev,
+                  amount: parseFloat(e.target.value) || 0,
+                }))
               }
-              placeholder="0.00"
               className="w-full"
             />
           </div>
@@ -564,11 +578,12 @@ export default function CashManagementPage() {
               <Label>Amount</Label>
               <Input
                 type="number"
+                placeholder="৳0.00"
                 value={newEntry.amount}
                 onChange={(e) =>
                   setNewEntry({
                     ...newEntry,
-                    amount: parseFloat(e.target.value),
+                    amount: parseFloat(e.target.value) || 0,
                   })
                 }
               />
@@ -644,25 +659,33 @@ export default function CashManagementPage() {
                             </TableCell>
                             <TableCell>{entry.details}</TableCell>
                             <TableCell className="text-right">
-                              {entry.type === "in"
-                                ? `$${entry.amount.toFixed(2)}`
-                                : ""}
+                              <span
+                                className={
+                                  entry.type === "in"
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }
+                              >
+                                {entry.type === "in" ? "+" : "-"}৳
+                                {Math.abs(entry.amount).toFixed(2)}
+                              </span>
                             </TableCell>
                             <TableCell className="text-right">
                               {entry.type === "out"
-                                ? `$${entry.amount.toFixed(2)}`
+                                ? `৳${entry.amount.toFixed(2)}`
                                 : ""}
                             </TableCell>
                             <TableCell className="text-right">
                               {index === dayEntries.length - 1 ? (
                                 <span
                                   className={
-                                    dayBalance >= 0
+                                    dayBalance > 0
                                       ? "text-green-600"
                                       : "text-red-600"
                                   }
                                 >
-                                  ${dayBalance.toFixed(2)}
+                                  {dayBalance > 0 ? "+" : "-"}৳
+                                  {Math.abs(dayBalance).toFixed(2)}
                                 </span>
                               ) : (
                                 ""

@@ -9,6 +9,9 @@ import {
   query,
   orderByChild,
   onValue,
+  update,
+  serverTimestamp,
+  equalTo,
 } from "firebase/database";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -50,6 +53,7 @@ import {
 } from "@/Components/ui/popover";
 import { cn } from "@/lib/utils";
 import { dateUtils } from "@/lib/dateUtils";
+import { toast } from "react-hot-toast";
 
 export default function MemosPage() {
   // State management
@@ -63,10 +67,12 @@ export default function MemosPage() {
     customerName: "",
     customerPhone: "",
     customerAddress: "",
+    memoNumber: "",
     products: [],
     totalBill: 0,
     paymentAmount: 0,
     credit: 0,
+    customMemo: "",
   });
   const [customPrice, setCustomPrice] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -114,21 +120,17 @@ export default function MemosPage() {
         const unsubscribe = onValue(
           memosRef,
           (snapshot) => {
-            try {
-              if (snapshot.exists()) {
-                const memosData = Object.entries(snapshot.val()).map(
-                  ([id, data]) => ({
-                    id,
-                    ...data,
-                    date: dateUtils.formatDate(data.date),
-                  })
-                );
-                setMemos(memosData);
-              }
-              setLoading(false);
-            } catch (err) {
-              setError(err.message);
-              setLoading(false);
+            if (snapshot.exists()) {
+              const memosData = Object.entries(snapshot.val())
+                .map(([id, data]) => ({
+                  id,
+                  ...data,
+                  date: dateUtils.formatDate(data.date),
+                }))
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+              setMemos(memosData);
+            } else {
+              setMemos([]);
             }
           },
           (error) => {
@@ -183,24 +185,24 @@ export default function MemosPage() {
   // Add product to memo
   const addProductToMemo = () => {
     if (!selectedProduct) {
-      alert("Please select a product");
+      toast.error("Please select a product");
       return;
     }
 
     const product = products.find((p) => p.id === selectedProduct);
 
     if (!product) {
-      alert("Product not found");
+      toast.error("Product not found");
       return;
     }
 
     if (productQuantity <= 0) {
-      alert("Please enter a valid quantity");
+      toast.error("Please enter a valid quantity");
       return;
     }
 
     if (productQuantity > product.quantity) {
-      alert(`Only ${product.quantity} items available in stock`);
+      toast.error(`Only ${product.quantity} items available in stock`);
       return;
     }
 
@@ -253,34 +255,83 @@ export default function MemosPage() {
     setCustomPrice("");
   };
 
-  // Save memo
+  // Add this function to update stock quantities
+  const updateStockQuantities = async (products) => {
+    try {
+      const productsRef = ref(db, "products");
+      const updates = {};
+
+      // Get current stock quantities
+      const snapshot = await get(productsRef);
+      const currentStock = snapshot.val();
+
+      // Update quantities for each product
+      for (const product of products) {
+        const currentQuantity = currentStock[product.id]?.quantity || 0;
+        const newQuantity = currentQuantity - product.quantity;
+
+        if (newQuantity < 0) {
+          throw new Error(`Insufficient stock for ${product.name}`);
+        }
+
+        updates[`${product.id}/quantity`] = newQuantity;
+      }
+
+      // Update all products atomically
+      await update(productsRef, updates);
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      throw error;
+    }
+  };
+
+  // Update the addMemo function
   const addMemo = async () => {
     if (newMemo.products.length === 0) {
-      alert("Please add at least one product");
+      toast.error("Please add at least one product");
       return;
     }
 
     if (!newMemo.customerName || !newMemo.customerPhone) {
-      alert("Please enter customer information");
+      toast.error("Please enter customer information");
       return;
     }
 
+    if (!newMemo.memoNumber.trim()) {
+      toast.error("Please enter a memo number");
+      return;
+    }
+
+    setLoading(true);
+
     try {
+      // Check if memo number already exists
+      const memosRef = ref(db, "memos");
+      const memoQuery = query(
+        memosRef,
+        orderByChild("memoNumber"),
+        equalTo(newMemo.memoNumber)
+      );
+      const snapshot = await get(memoQuery);
+
+      if (snapshot.exists()) {
+        toast.error("Memo number already exists");
+        setLoading(false);
+        return;
+      }
+
+      // First update stock quantities
+      await updateStockQuantities(newMemo.products);
+
       const memoData = {
         ...newMemo,
         createdAt: new Date().toISOString(),
       };
 
-      // 1. Save the memo
-      const memosRef = ref(db, "memos");
+      // Save the memo
       const newRef = await push(memosRef, memoData);
 
-      const newMemoWithId = {
-        id: newRef.key,
-        ...memoData,
-      };
-
-      // 2. If there's a payment amount, create a cash entry
+      // Handle payment if exists
       if (newMemo.paymentAmount > 0) {
         const cashEntryRef = ref(db, "cashEntries");
         await push(cashEntryRef, {
@@ -288,11 +339,10 @@ export default function MemosPage() {
           type: "in",
           amount: newMemo.paymentAmount,
           category: "memo_payment",
-          details: `Memo Payment - ${newMemo.customerName} (#${newRef.key
-            .slice(0, 8)
-            .toUpperCase()})`,
+          details: `Memo Payment - ${newMemo.customerName} (#${newMemo.memoNumber})`,
           reference: {
             memoId: newRef.key,
+            memoNumber: newMemo.memoNumber,
             customerName: newMemo.customerName,
             customerPhone: newMemo.customerPhone,
             transactionType: "memo_payment",
@@ -301,24 +351,26 @@ export default function MemosPage() {
         });
       }
 
-      setMemos((prev) => [newMemoWithId, ...prev]);
-
       // Reset form
       setNewMemo({
         date: new Date().toISOString().split("T")[0],
         customerName: "",
         customerPhone: "",
         customerAddress: "",
+        memoNumber: "",
         products: [],
         totalBill: 0,
         paymentAmount: 0,
         credit: 0,
+        customMemo: "",
       });
 
-      alert("Memo saved successfully!");
+      toast.success("Memo created successfully!");
     } catch (error) {
-      console.error("Error saving memo:", error);
-      alert("Failed to save memo. Please try again.");
+      console.error("Error creating memo:", error);
+      toast.error(error.message || "Failed to create memo");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -349,13 +401,47 @@ export default function MemosPage() {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(startIndex, endIndex);
 
+  // Add a function to validate stock before adding to selected products
+  const handleAddProduct = (product) => {
+    if (product.quantity < selectedQuantity) {
+      toast.error(`Only ${product.quantity} items available in stock`);
+      return;
+    }
+
+    const newProduct = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: selectedQuantity,
+    };
+
+    setSelectedProducts([...selectedProducts, newProduct]);
+    setSelectedProduct(null);
+    setSelectedQuantity(1);
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6 text-center">Memo Management</h1>
 
       {/* Customer Information */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-xl font-semibold mb-4">Customer Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <Label htmlFor="memoNumber">Memo Number</Label>
+            <Input
+              id="memoNumber"
+              placeholder="Enter memo number"
+              value={newMemo.memoNumber}
+              onChange={(e) =>
+                setNewMemo((prev) => ({
+                  ...prev,
+                  memoNumber: e.target.value,
+                }))
+              }
+            />
+          </div>
           <div>
             <Label htmlFor="customerPhone">Phone</Label>
             <Input
@@ -505,9 +591,11 @@ export default function MemosPage() {
           </div>
           <div className="text-right">
             <p className="text-lg font-semibold">
-              Total Bill: ${newMemo.totalBill}
+              Total Bill: ৳{newMemo.totalBill.toFixed(2)}
             </p>
-            <p className="text-lg text-red-500">Credit: ${newMemo.credit}</p>
+            <p className="text-lg text-red-500">
+              Credit: ৳{newMemo.credit.toFixed(2)}
+            </p>
           </div>
         </div>
 
@@ -620,16 +708,26 @@ export default function MemosPage() {
               {currentMemos.map((memo) => (
                 <TableRow key={memo.id} className="hover:bg-gray-50">
                   <TableCell>{memo.date}</TableCell>
-                  <TableCell>{memo.id}</TableCell>
+                  <TableCell className="font-medium">
+                    {memo.memoNumber || memo.id.slice(0, 8).toUpperCase()}
+                  </TableCell>
                   <TableCell>{memo.customerName}</TableCell>
                   <TableCell>{memo.customerPhone}</TableCell>
                   <TableCell className="text-right">
-                    ${memo.totalBill}
+                    ৳{memo.totalBill.toFixed(2)}
                   </TableCell>
                   <TableCell className="text-right">
-                    ${memo.paymentAmount}
+                    ৳{memo.paymentAmount.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-right">${memo.credit}</TableCell>
+                  <TableCell className="text-right">
+                    <span
+                      className={
+                        memo.credit > 0 ? "text-red-600" : "text-green-600"
+                      }
+                    >
+                      ৳{memo.credit.toFixed(2)}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"

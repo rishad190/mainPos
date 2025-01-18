@@ -13,6 +13,7 @@ import {
 } from "@/Components/ui/table";
 import { db } from "@/lib/firebase";
 import { ref, push, get, set } from "firebase/database";
+import { Label } from "@/Components/ui/label";
 
 export default function StockPage() {
   const [products, setProducts] = useState([
@@ -92,6 +93,16 @@ export default function StockPage() {
     }
   };
 
+  const StockStatus = ({ quantity }) => {
+    if (quantity <= 0) {
+      return <span className="text-red-600 font-medium">Out of Stock</span>;
+    }
+    if (quantity < 10) {
+      return <span className="text-orange-600 font-medium">Low Stock</span>;
+    }
+    return <span className="text-green-600 font-medium">In Stock</span>;
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6 text-center">Stock Management</h1>
@@ -100,27 +111,40 @@ export default function StockPage() {
         <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              name="name"
-              placeholder="Product Name"
-              value={newProduct.name}
-              onChange={handleInputChange}
-            />
-            <Input
-              name="price"
-              type="number"
-              step="0.01"
-              placeholder="Price"
-              value={newProduct.price}
-              onChange={handleInputChange}
-            />
-            <Input
-              name="quantity"
-              type="number"
-              placeholder="Quantity"
-              value={newProduct.quantity}
-              onChange={handleInputChange}
-            />
+            <div>
+              <Label htmlFor="name">Product Name</Label>
+              <Input
+                id="name"
+                name="name"
+                placeholder="Product Name"
+                value={newProduct.name}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="price">Price</Label>
+              <Input
+                id="price"
+                name="price"
+                type="number"
+                placeholder="৳0.00"
+                value={newProduct.price}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                name="quantity"
+                type="number"
+                placeholder="Quantity"
+                value={newProduct.quantity}
+                onChange={handleInputChange}
+              />
+            </div>
           </div>
           <Button type="submit" className="w-full">
             Add Product
@@ -144,10 +168,13 @@ export default function StockPage() {
                 <TableCell className="p-2 border-b">{product.id}</TableCell>
                 <TableCell className="p-2 border-b">{product.name}</TableCell>
                 <TableCell className="p-2 border-b">
-                  ${product.price.toFixed(2)}
+                  ৳{product.price.toFixed(2)}
                 </TableCell>
                 <TableCell className="p-2 border-b">
-                  {product.quantity}
+                  <div className="flex items-center justify-between">
+                    <span>{product.quantity}</span>
+                    <StockStatus quantity={product.quantity} />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

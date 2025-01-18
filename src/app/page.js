@@ -29,6 +29,17 @@ import {
   Clock,
 } from "lucide-react";
 
+// Update chart tooltip formats
+const chartConfig = {
+  tooltip: {
+    formatter: (value) => `৳${value.toFixed(2)}`,
+  },
+  // ... other chart config
+};
+
+// Update any value formatters
+const valueFormatter = (value) => `৳${value.toFixed(2)}`;
+
 export default function Home() {
   const [totals, setTotals] = useState({
     customers: 0,
@@ -148,7 +159,7 @@ export default function Home() {
           <CardContent>
             <div className="flex flex-col gap-1">
               <div className="text-2xl font-bold">
-                ${totals.sales.toFixed(2)}
+                ৳{totals.sales.toFixed(2)}
               </div>
               <div className="flex items-center text-sm">
                 <span className="text-green-600 flex items-center">
@@ -172,7 +183,7 @@ export default function Home() {
           <CardContent>
             <div className="flex flex-col gap-1">
               <div className="text-2xl font-bold">
-                ${totals.pendingPayments.toFixed(2)}
+                ৳{totals.pendingPayments.toFixed(2)}
               </div>
               <p className="text-sm text-gray-500">
                 From {totals.memos} total memos
@@ -192,7 +203,7 @@ export default function Home() {
           <CardContent>
             <div className="flex flex-col gap-1">
               <div className="text-2xl font-bold">
-                ${totals.credits.toFixed(2)}
+                ৳{totals.credits.toFixed(2)}
               </div>
               <div className="flex items-center text-sm">
                 <span
@@ -278,7 +289,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">${transaction.totalBill}</p>
+                  <p className="font-medium">৳{transaction.totalBill}</p>
                   <p className="text-sm text-gray-500">
                     {new Date(transaction.date).toLocaleDateString()}
                   </p>

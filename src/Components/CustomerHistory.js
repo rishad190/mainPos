@@ -75,6 +75,12 @@ const CustomerHistory = ({ customerId }) => {
     from: undefined,
     to: undefined,
   });
+  const [totals, setTotals] = useState({
+    totalPurchases: 0,
+    totalPayments: 0,
+    totalGivenMoney: 0,
+    outstandingCredit: 0,
+  });
 
   useEffect(() => {
     if (!customerId) return;
@@ -82,44 +88,63 @@ const CustomerHistory = ({ customerId }) => {
     const memosRef = ref(db, "memos");
     const customerMemosQuery = query(
       memosRef,
-      orderByChild("customerPhone"), // Using customerPhone as it's the field we store in memos
+      orderByChild("customerPhone"),
       equalTo(customerId)
     );
 
-    const unsubscribe = onValue(
-      customerMemosQuery,
-      (snapshot) => {
-        try {
-          if (snapshot.exists()) {
-            const memosData = Object.entries(snapshot.val()).map(
-              ([id, data]) => ({
-                id,
-                date: dateUtils.formatDate(data.date),
-                memoNumber: id.slice(0, 8).toUpperCase(),
-                productNames: data.products.map(
-                  (p) => `${p.name} (${p.quantity}x)`
-                ),
-                totalPrice: data.totalBill,
-                givenMoney: data.paymentAmount,
-                credit: data.credit || 0,
-              })
-            );
-            setHistory(memosData.sort((a, b) => b.date.localeCompare(a.date)));
-          } else {
-            setHistory([]);
-          }
-        } catch (error) {
-          console.error("Error processing customer history:", error);
+    const unsubscribe = onValue(customerMemosQuery, (snapshot) => {
+      try {
+        if (snapshot.exists()) {
+          const memosData = Object.entries(snapshot.val()).map(
+            ([id, data]) => ({
+              id,
+              date: dateUtils.formatDate(data.date),
+              memoNumber: data.memoNumber || id.slice(0, 8).toUpperCase(),
+              productNames: data.products.map(
+                (p) => `${p.name} (${p.quantity}x)`
+              ),
+              totalPrice: data.totalBill,
+              givenMoney: data.paymentAmount,
+              credit: data.credit || 0,
+            })
+          );
+
+          const totalPurchases = memosData.reduce(
+            (sum, memo) => sum + memo.totalPrice,
+            0
+          );
+          const totalGivenMoney = memosData.reduce(
+            (sum, memo) => sum + memo.givenMoney,
+            0
+          );
+
+          const outstandingCredit =
+            totalPurchases - (totals.totalPayments + totalGivenMoney);
+
+          setTotals((prev) => ({
+            ...prev,
+            totalPurchases,
+            totalGivenMoney,
+            outstandingCredit,
+          }));
+
+          setHistory(memosData.sort((a, b) => b.date.localeCompare(a.date)));
+        } else {
           setHistory([]);
-        } finally {
-          setLoading(false);
+          setTotals((prev) => ({
+            ...prev,
+            totalPurchases: 0,
+            totalGivenMoney: 0,
+            outstandingCredit: 0,
+          }));
         }
-      },
-      (error) => {
-        console.error("Error fetching customer history:", error);
+      } catch (error) {
+        console.error("Error processing customer history:", error);
+        setHistory([]);
+      } finally {
         setLoading(false);
       }
-    );
+    });
 
     return () => unsubscribe();
   }, [customerId]);
@@ -142,6 +167,19 @@ const CustomerHistory = ({ customerId }) => {
             ...data,
           })
         );
+
+        const totalPayments = paymentsData.reduce(
+          (sum, payment) => sum + (payment.amount || 0),
+          0
+        );
+
+        setTotals((prev) => ({
+          ...prev,
+          totalPayments,
+          outstandingCredit:
+            prev.totalPurchases - (totalPayments + prev.totalGivenMoney),
+        }));
+
         setPaymentHistory(
           paymentsData.sort((a, b) => b.date.localeCompare(a.date))
         );
@@ -218,9 +256,9 @@ const CustomerHistory = ({ customerId }) => {
       Date: item.date,
       "Memo Number": item.memoNumber,
       Products: (item.productNames || []).join(", "),
-      "Total Amount": (item.totalPrice || 0).toFixed(2),
-      "Amount Paid": (item.givenMoney || 0).toFixed(2),
-      Credit: (item.credit || 0).toFixed(2),
+      "Total Amount": `৳${(item.totalPrice || 0).toFixed(2)}`,
+      "Amount Paid": `৳${(item.givenMoney || 0).toFixed(2)}`,
+      Credit: `৳${(item.credit || 0).toFixed(2)}`,
     }));
 
     exportCustomerHistory(exportData);
@@ -243,77 +281,60 @@ const CustomerHistory = ({ customerId }) => {
     );
   }
 
-  const totalPurchases = history.reduce(
-    (sum, item) => sum + (item.totalPrice || 0),
-    0
-  );
-  const totalPayments = paymentHistory.reduce(
-    (sum, payment) => sum + (payment.amount || 0),
-    0
-  );
-  const totalSpent = totalPurchases + totalPayments;
-
-  const averageTransaction =
-    history.length > 0 ? totalPurchases / history.length : 0;
-  const outstandingCredit = totalPurchases - totalPayments;
-
-  const summaryCards = [
-    {
-      title: "Total Spent",
-      value: totalSpent || 0,
-      icon: DollarSign,
-      color: "text-purple-600",
-    },
-    {
-      title: "Average Bill",
-      value: averageTransaction || 0,
-      icon: Calculator,
-      color: "text-blue-600",
-    },
-    {
-      title: "Outstanding Credit",
-      value: outstandingCredit || 0,
-      icon: CreditCard,
-      color: outstandingCredit > 0 ? "text-red-600" : "text-green-600",
-    },
-    {
-      title: "Total Purchases",
-      value: history.length,
-      icon: Receipt,
-      color: "text-purple-600",
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        {summaryCards.map((card) => (
-          <Card
-            key={card.title}
-            className="transition-all duration-200 hover:shadow-md"
-          >
-            <CardContent className="flex items-center p-6">
-              <div
-                className={`p-3 rounded-full ${card.color
-                  .replace("text-", "bg-")
-                  .replace("600", "100")}`}
-              >
-                <card.icon className={`h-6 w-6 ${card.color}`} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">
-                  {card.title}
-                </p>
-                <p className={`text-2xl font-semibold ${card.color}`}>
-                  {typeof card.value === "number" &&
-                  card.title !== "Total Purchases"
-                    ? `$${card.value.toFixed(2)}`
-                    : card.value}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Purchases
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ৳{totals.totalPurchases.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Payments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ৳{totals.totalPayments.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Given Money
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ৳{totals.totalGivenMoney.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Outstanding Credit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              ৳{totals.outstandingCredit.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
@@ -443,21 +464,24 @@ const CustomerHistory = ({ customerId }) => {
                   <TableHead className="text-right whitespace-nowrap">
                     Credit
                   </TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentItems.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell>{dateUtils.formatDate(item.date)}</TableCell>
-                    <TableCell>{item.memoNumber}</TableCell>
+                    <TableCell>{item.date}</TableCell>
+                    <TableCell className="font-medium">
+                      {item.memoNumber}
+                    </TableCell>
                     <TableCell>
                       {(item.productNames || []).join(", ")}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${(item.totalPrice || 0).toFixed(2)}
+                      ৳{(item.totalPrice || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${(item.givenMoney || 0).toFixed(2)}
+                      ৳{(item.givenMoney || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       <span
@@ -467,8 +491,11 @@ const CustomerHistory = ({ customerId }) => {
                             : "text-green-600"
                         }`}
                       >
-                        ${(item.credit || 0).toFixed(2)}
+                        ৳{(item.credit || 0).toFixed(2)}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {/* ... existing action buttons ... */}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -516,15 +543,15 @@ const CustomerHistory = ({ customerId }) => {
                       }
                     )}
                   </TableCell>
-                  <TableCell>${(payment.amount || 0).toFixed(2)}</TableCell>
+                  <TableCell>৳{payment.amount.toFixed(2)}</TableCell>
                   <TableCell className="capitalize">
                     {payment.paymentMethod || "cash"}
                   </TableCell>
                   <TableCell>
-                    ${(relatedMemo.totalPrice || 0).toFixed(2)}
+                    ৳{(relatedMemo.totalPrice || 0).toFixed(2)}
                   </TableCell>
                   <TableCell>
-                    ${(relatedMemo.givenMoney || 0).toFixed(2)}
+                    ৳{(relatedMemo.givenMoney || 0).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <span
@@ -534,7 +561,7 @@ const CustomerHistory = ({ customerId }) => {
                           : "text-green-600"
                       }`}
                     >
-                      ${(relatedMemo.credit || 0).toFixed(2)}
+                      ৳{(relatedMemo.credit || 0).toFixed(2)}
                     </span>
                   </TableCell>
                 </TableRow>

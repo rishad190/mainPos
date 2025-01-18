@@ -3,7 +3,7 @@
     ".read": "auth != null",
     ".write": "auth != null",
     "memos": {
-      ".indexOn": ["date", "createdAt", "customerPhone", "totalBill"],
+      ".indexOn": ["date", "createdAt", "customerPhone", "totalBill", "customerName"],
       ".read": "auth != null",
       ".write": "auth != null",
       ".validate": "newData.hasChildren(['customerName', 'customerPhone', 'products'])",
@@ -12,27 +12,27 @@
       }
     },
     "customers": {
-      ".indexOn": ["name", "phone"],
+      ".indexOn": ["name", "phone", "createdAt"],
       ".read": "auth != null",
       ".write": "auth != null"
     },
     "products": {
-      ".indexOn": ["name"],
+      ".indexOn": ["name", "createdAt", "category"],
       ".read": "auth != null",
       ".write": "auth != null"
     },
     "cashEntries": {
-      ".indexOn": ["date", "createdAt"],
+      ".indexOn": ["date", "createdAt", "type"],
       ".read": "auth != null",
       ".write": "auth != null"
     },
     "transactions": {
-      ".indexOn": ["date", "createdAt"],
+      ".indexOn": ["date", "createdAt", "type"],
       ".read": "auth != null",
       ".write": "auth != null"
     },
     "customerPayments": {
-      ".indexOn": ["customerPhone", "date", "createdAt"],
+      ".indexOn": ["customerPhone", "date", "createdAt", "amount"],
       ".read": "auth != null",
       ".write": "auth != null"
     }
