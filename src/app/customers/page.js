@@ -703,7 +703,7 @@ export default function CustomersPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the customer{" "}
+                This will permanently delete the customer
                 <span className="font-semibold">{customerToDelete?.name}</span>.
                 This action cannot be undone.
               </AlertDialogDescription>
