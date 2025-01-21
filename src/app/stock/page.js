@@ -12,8 +12,16 @@ import {
   TableRow,
 } from "@/Components/ui/table";
 import { db } from "@/lib/firebase";
-import { ref, push, get, set } from "firebase/database";
+import { ref, push, get, set, remove, update } from "firebase/database";
 import { Label } from "@/Components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
+import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export default function StockPage() {
   const [products, setProducts] = useState([
@@ -26,6 +34,9 @@ export default function StockPage() {
     price: "",
     quantity: "",
   });
+
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -93,6 +104,70 @@ export default function StockPage() {
     }
   };
 
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setNewProduct({
+      name: product.name,
+      price: product.price,
+      quantity: product.quantity,
+    });
+    setIsEditing(true);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+
+    if (!newProduct.name || !newProduct.price || !newProduct.quantity) {
+      toast.error("Please fill all fields");
+      return;
+    }
+
+    try {
+      const productRef = ref(db, `products/${editingProduct.id}`);
+      await update(productRef, {
+        name: newProduct.name,
+        price: parseFloat(newProduct.price),
+        quantity: parseInt(newProduct.quantity),
+        updatedAt: new Date().toISOString(),
+      });
+
+      setProducts(
+        products.map((p) =>
+          p.id === editingProduct.id
+            ? {
+                ...p,
+                name: newProduct.name,
+                price: parseFloat(newProduct.price),
+                quantity: parseInt(newProduct.quantity),
+              }
+            : p
+        )
+      );
+
+      setNewProduct({ name: "", price: "", quantity: "" });
+      setEditingProduct(null);
+      setIsEditing(false);
+      toast.success("Product updated successfully");
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast.error("Failed to update product");
+    }
+  };
+
+  const handleDelete = async (productId) => {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      try {
+        const productRef = ref(db, `products/${productId}`);
+        await remove(productRef);
+        setProducts(products.filter((p) => p.id !== productId));
+        toast.success("Product deleted successfully");
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        toast.error("Failed to delete product");
+      }
+    }
+  };
+
   const StockStatus = ({ quantity }) => {
     if (quantity <= 0) {
       return <span className="text-red-600 font-medium">Out of Stock</span>;
@@ -108,8 +183,13 @@ export default function StockPage() {
       <h1 className="text-3xl font-bold mb-6 text-center">Stock Management</h1>
 
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <h2 className="text-xl font-semibold mb-4">
+          {isEditing ? "Edit Product" : "Add New Product"}
+        </h2>
+        <form
+          onSubmit={isEditing ? handleUpdate : handleSubmit}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="name">Product Name</Label>
@@ -147,8 +227,22 @@ export default function StockPage() {
             </div>
           </div>
           <Button type="submit" className="w-full">
-            Add Product
+            {isEditing ? "Update Product" : "Add Product"}
           </Button>
+          {isEditing && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mt-2"
+              onClick={() => {
+                setIsEditing(false);
+                setEditingProduct(null);
+                setNewProduct({ name: "", price: "", quantity: "" });
+              }}
+            >
+              Cancel
+            </Button>
+          )}
         </form>
       </div>
 
@@ -160,6 +254,7 @@ export default function StockPage() {
               <TableHead className="p-2 border-b">Name</TableHead>
               <TableHead className="p-2 border-b">Price</TableHead>
               <TableHead className="p-2 border-b">Quantity</TableHead>
+              <TableHead className="p-2 border-b">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -175,6 +270,31 @@ export default function StockPage() {
                     <span>{product.quantity}</span>
                     <StockStatus quantity={product.quantity} />
                   </div>
+                </TableCell>
+                <TableCell className="p-2 border-b">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleEdit(product)}
+                        className="cursor-pointer"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(product.id)}
+                        className="cursor-pointer text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}

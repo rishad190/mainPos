@@ -15,6 +15,7 @@ import {
 } from "firebase/database";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
+import { Label } from "@/Components/ui/label";
 import { Card } from "@/Components/ui/card";
 import {
   Table,
@@ -54,6 +55,15 @@ import {
   TooltipTrigger,
 } from "@/Components/ui/tooltip";
 import CustomerHistory from "@/Components/CustomerHistory";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/Components/ui/popover";
+import { Calendar } from "@/Components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -63,6 +73,7 @@ export default function CustomersPage() {
     name: "",
     phone: "",
     address: "",
+    date: new Date().toDateString(),
   });
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -153,7 +164,12 @@ export default function CustomersPage() {
       };
 
       setCustomers((prev) => [newCustomerWithId, ...prev]);
-      setNewCustomer({ name: "", phone: "", address: "" });
+      setNewCustomer({
+        name: "",
+        phone: "",
+        address: "",
+        date: new Date().toDateString(),
+      });
       setError(null);
     } catch (err) {
       console.error("Error adding customer:", err);
@@ -412,6 +428,43 @@ export default function CustomersPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Registration Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !newCustomer.date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newCustomer.date ? (
+                      format(new Date(Date.parse(newCustomer.date)), "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={new Date(Date.parse(newCustomer.date))}
+                    defaultMonth={new Date()}
+                    onSelect={(date) =>
+                      setNewCustomer({
+                        ...newCustomer,
+                        date: date
+                          ? date.toDateString()
+                          : new Date().toDateString(),
+                      })
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           <Button
             onClick={addCustomer}
@@ -438,6 +491,7 @@ export default function CustomersPage() {
                   </TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
+                  <TableHead>Registration Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -533,6 +587,43 @@ export default function CustomersPage() {
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-gray-400" />
                             {customer.address}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50">
+                        {customer.date === new Date().toDateString() ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-blue-600">
+                              Today
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(customer.createdAt).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {new Date(
+                                Date.parse(customer.createdAt)
+                              ).toDateString()}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(customer.createdAt).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }
+                              )}
+                            </span>
                           </div>
                         )}
                       </TableCell>

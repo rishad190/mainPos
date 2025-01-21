@@ -49,6 +49,7 @@ import {
   PopoverTrigger,
 } from "@/Components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Edit, Trash2, Receipt } from "lucide-react";
 
 const groupByDate = (entries) => {
   return entries.reduce((groups, entry) => {
@@ -61,10 +62,43 @@ const groupByDate = (entries) => {
   }, {});
 };
 
+const LoadingState = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="flex flex-col items-center gap-2">
+      <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      <p className="text-sm text-gray-500">Loading transactions...</p>
+    </div>
+  </div>
+);
+
+// Add these helper functions before the component
+const calculateTotalCashIn = (entries) => {
+  return entries
+    .filter((entry) => entry.type === "in")
+    .reduce((total, entry) => total + entry.amount, 0);
+};
+
+const calculateTotalCashOut = (entries) => {
+  return entries
+    .filter((entry) => entry.type === "out")
+    .reduce((total, entry) => total + entry.amount, 0);
+};
+
+const calculateNetBalance = (entries) => {
+  return calculateTotalCashIn(entries) - calculateTotalCashOut(entries);
+};
+
+const getNetBalanceColor = (entries) => {
+  const balance = calculateNetBalance(entries);
+  if (balance > 0) return "text-green-600";
+  if (balance < 0) return "text-red-600";
+  return "text-gray-600";
+};
+
 export default function CashManagementPage() {
   const [entries, setEntries] = useState([]);
   const [newEntry, setNewEntry] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: new Date().toDateString(),
     details: "",
     type: "in",
     amount: 0,
@@ -82,6 +116,8 @@ export default function CashManagementPage() {
     from: undefined,
     to: undefined,
   });
+
+  console.log("Current Date:", new Date().toDateString());
 
   useEffect(() => {
     const entriesRef = ref(db, "cashEntries");
@@ -122,7 +158,7 @@ export default function CashManagementPage() {
 
   // Function to check and add opening balance
   const checkAndAddOpeningBalance = async (currentEntries) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toDateString();
     const hasOpeningBalanceToday = currentEntries.some(
       (entry) => entry.date === today && entry.category === "opening_balance"
     );
@@ -131,7 +167,7 @@ export default function CashManagementPage() {
       // Get yesterday's entries
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      const yesterdayStr = yesterday.toDateString();
 
       const yesterdayEntries = currentEntries.filter(
         (entry) => entry.date === yesterdayStr
@@ -190,7 +226,7 @@ export default function CashManagementPage() {
 
       setEntries([entry, ...entries]);
       setNewEntry({
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toDateString(),
         details: "",
         type: "in",
         amount: 0,
@@ -239,7 +275,7 @@ export default function CashManagementPage() {
       });
 
       setNewEntry({
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toDateString(),
         details: "",
         type: "in",
         amount: 0,
@@ -296,6 +332,28 @@ export default function CashManagementPage() {
   const endIndex = startIndex + itemsPerPage;
   const currentEntries = filteredEntries.slice(startIndex, endIndex);
 
+  const getCategoryColor = (category) => {
+    const colors = {
+      sales: "bg-green-100 text-green-800",
+      purchase: "bg-blue-100 text-blue-800",
+      expense: "bg-red-100 text-red-800",
+      salary: "bg-yellow-100 text-yellow-800",
+      other: "bg-gray-100 text-gray-800",
+    };
+    return colors[category] || colors.other;
+  };
+
+  const calculateRunningBalance = (entries, currentEntry) => {
+    const index = entries.findIndex((e) => e.id === currentEntry.id);
+    return entries
+      .slice(0, index + 1)
+      .reduce(
+        (sum, entry) =>
+          sum + (entry.type === "in" ? entry.amount : -entry.amount),
+        0
+      );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-8">
       {/* Header Section */}
@@ -307,43 +365,62 @@ export default function CashManagementPage() {
             {entries.length > 0 && (
               <span
                 className={`text-lg font-semibold ${
-                  calculateDayTotal(
-                    entries,
-                    new Date().toISOString().split("T")[0]
-                  ).cashIn -
-                    calculateDayTotal(
-                      entries,
-                      new Date().toISOString().split("T")[0]
-                    ).cashOut >
+                  calculateDayTotal(entries, new Date().toDateString()).cashIn -
+                    calculateDayTotal(entries, new Date().toDateString())
+                      .cashOut >
                   0
                     ? "text-green-600"
                     : "text-red-600"
                 }`}
               >
-                {calculateDayTotal(
-                  entries,
-                  new Date().toISOString().split("T")[0]
-                ).cashIn -
-                  calculateDayTotal(
-                    entries,
-                    new Date().toISOString().split("T")[0]
-                  ).cashOut >
+                {calculateDayTotal(entries, new Date().toDateString()).cashIn -
+                  calculateDayTotal(entries, new Date().toDateString())
+                    .cashOut >
                 0
                   ? "+"
                   : "-"}
                 ৳
                 {Math.abs(
-                  calculateDayTotal(
-                    entries,
-                    new Date().toISOString().split("T")[0]
-                  ).cashIn -
-                    calculateDayTotal(
-                      entries,
-                      new Date().toISOString().split("T")[0]
-                    ).cashOut
+                  calculateDayTotal(entries, new Date().toDateString()).cashIn -
+                    calculateDayTotal(entries, new Date().toDateString())
+                      .cashOut
                 ).toFixed(2)}
               </span>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add this after the header section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">
+            Total Cash In
+          </h3>
+          <div className="text-2xl font-bold text-green-600">
+            ৳{calculateTotalCashIn(filteredEntries).toFixed(2)}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">
+            Total Cash Out
+          </h3>
+          <div className="text-2xl font-bold text-red-600">
+            ৳{calculateTotalCashOut(filteredEntries).toFixed(2)}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">
+            Net Balance
+          </h3>
+          <div
+            className={`text-2xl font-bold ${getNetBalanceColor(
+              filteredEntries
+            )}`}
+          >
+            ৳{calculateNetBalance(filteredEntries).toFixed(2)}
           </div>
         </div>
       </div>
@@ -433,18 +510,41 @@ export default function CashManagementPage() {
         <h2 className="text-xl font-semibold mb-6">New Transaction</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
-            <Label htmlFor="date" className="text-sm font-medium">
-              Date
-            </Label>
-            <Input
-              id="date"
-              type="date"
-              value={newEntry.date}
-              onChange={(e) =>
-                setNewEntry({ ...newEntry, date: e.target.value })
-              }
-              className="w-full"
-            />
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !newEntry.date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {newEntry.date ? (
+                    format(new Date(newEntry.date), "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={new Date(Date.parse(newEntry.date))}
+                  defaultMonth={new Date()}
+                  onSelect={(date) =>
+                    setNewEntry({
+                      ...newEntry,
+                      date: date
+                        ? new Date(date).toDateString()
+                        : new Date().toDateString(),
+                    })
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">
@@ -630,75 +730,115 @@ export default function CashManagementPage() {
       <div className="bg-white rounded-xl shadow-sm border p-6">
         <h2 className="text-xl font-semibold mb-6">Transaction History</h2>
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="w-[150px]">Date</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead className="text-right">Cash In</TableHead>
-                <TableHead className="text-right">Cash Out</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(groupByDate(currentEntries))
-                .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
-                .map(([date, dayEntries]) => {
-                  const totals = calculateDayTotal(dayEntries, date);
-                  const dayBalance = totals.cashIn - totals.cashOut;
-
-                  return (
-                    <React.Fragment key={date}>
-                      {dayEntries.map((entry, index) => {
-                        const formattedDate = dateUtils.formatDate(entry.date);
-
-                        return (
-                          <TableRow key={entry.id}>
-                            <TableCell>
-                              {index === 0 ? formattedDate : ""}
-                            </TableCell>
-                            <TableCell>{entry.details}</TableCell>
-                            <TableCell className="text-right">
-                              <span
-                                className={
-                                  entry.type === "in"
-                                    ? "text-green-600"
-                                    : "text-red-600"
-                                }
-                              >
-                                {entry.type === "in" ? "+" : "-"}৳
-                                {Math.abs(entry.amount).toFixed(2)}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {entry.type === "out"
-                                ? `৳${entry.amount.toFixed(2)}`
-                                : ""}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {index === dayEntries.length - 1 ? (
-                                <span
-                                  className={
-                                    dayBalance > 0
-                                      ? "text-green-600"
-                                      : "text-red-600"
-                                  }
-                                >
-                                  {dayBalance > 0 ? "+" : "-"}৳
-                                  {Math.abs(dayBalance).toFixed(2)}
-                                </span>
-                              ) : (
-                                ""
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-            </TableBody>
-          </Table>
+          {isLoading ? (
+            <LoadingState />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-[150px] font-medium">Date</TableHead>
+                  <TableHead className="font-medium">Details</TableHead>
+                  <TableHead className="text-right font-medium">
+                    Category
+                  </TableHead>
+                  <TableHead className="text-right font-medium">
+                    Amount
+                  </TableHead>
+                  <TableHead className="text-right font-medium">
+                    Balance
+                  </TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentEntries.map((entry) => (
+                  <TableRow
+                    key={entry.id}
+                    className="group hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell className="text-sm text-gray-600">
+                      {entry.date === new Date().toDateString() ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium text-blue-600">
+                            Today
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(entry.createdAt).toLocaleTimeString(
+                              "en-US",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              }
+                            )}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {new Date(Date.parse(entry.date)).toDateString()}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(
+                              Date.parse(entry.createdAt)
+                            ).toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{entry.details}</div>
+                      <div className="text-sm text-gray-500">
+                        {entry.category}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getCategoryColor(
+                          entry.category
+                        )}`}
+                      >
+                        {entry.category}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      <span
+                        className={
+                          entry.type === "in"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }
+                      >
+                        {entry.type === "in" ? "+" : "-"}৳
+                        {entry.amount.toFixed(2)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ৳{calculateRunningBalance(entries, entry).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
 
         {/* Add pagination controls */}
@@ -739,6 +879,23 @@ export default function CashManagementPage() {
             </PaginationContent>
           </Pagination>
         </div>
+
+        {/* Add this when there are no entries */}
+        {currentEntries.length === 0 && (
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+              <Receipt className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-sm font-medium text-gray-900 mb-1">
+              No transactions found
+            </h3>
+            <p className="text-sm text-gray-500">
+              {searchTerm || dateSearch.from
+                ? "Try adjusting your filters"
+                : "Add your first transaction to get started"}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

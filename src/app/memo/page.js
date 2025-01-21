@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import {
   ref,
@@ -43,6 +43,11 @@ import {
   Calendar as CalendarIcon,
   Pencil as EditIcon,
   Trash2 as DeleteIcon,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  Loader2,
+  ClipboardX,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/Components/ui/calendar";
@@ -54,6 +59,12 @@ import {
 import { cn } from "@/lib/utils";
 import { dateUtils } from "@/lib/dateUtils";
 import { toast } from "react-hot-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
 
 export default function MemosPage() {
   // State management
@@ -63,7 +74,7 @@ export default function MemosPage() {
   const [selectedProduct, setSelectedProduct] = useState("");
   const [productQuantity, setProductQuantity] = useState(1);
   const [newMemo, setNewMemo] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: new Date().toDateString(),
     customerName: "",
     customerPhone: "",
     customerAddress: "",
@@ -84,6 +95,12 @@ export default function MemosPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isValid, setIsValid] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch customers and products on component mount
   useEffect(() => {
@@ -353,7 +370,7 @@ export default function MemosPage() {
 
       // Reset form
       setNewMemo({
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toDateString(),
         customerName: "",
         customerPhone: "",
         customerAddress: "",
@@ -420,6 +437,125 @@ export default function MemosPage() {
     setSelectedQuantity(1);
   };
 
+  const handleEditProduct = (index) => {
+    const productToEdit = newMemo.products[index];
+    setSelectedProduct(productToEdit.id);
+    setSelectedQuantity(productToEdit.quantity);
+
+    // Remove the product from the list
+    const updatedProducts = [...newMemo.products];
+    updatedProducts.splice(index, 1);
+
+    setNewMemo((prev) => ({
+      ...prev,
+      products: updatedProducts,
+      totalBill: calculateTotal(updatedProducts),
+    }));
+  };
+
+  const handleDeleteProduct = (index) => {
+    const updatedProducts = [...newMemo.products];
+    updatedProducts.splice(index, 1);
+
+    setNewMemo((prev) => ({
+      ...prev,
+      products: updatedProducts,
+      totalBill: calculateTotal(updatedProducts),
+    }));
+
+    toast.success("Product removed from memo");
+  };
+
+  const calculateTotal = (products) => {
+    const total = products.reduce(
+      (sum, product) => sum + product.quantity * product.price,
+      0
+    );
+    return total;
+  };
+
+  // Add a loading state component
+  const LoadingState = () => (
+    <div className="flex items-center justify-center p-8">
+      <div className="flex flex-col items-center gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        <p className="text-sm text-gray-500">Loading...</p>
+      </div>
+    </div>
+  );
+
+  const EmptyState = ({ message }) => (
+    <div className="text-center py-12">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+        <ClipboardX className="h-8 w-8 text-gray-400" />
+      </div>
+      <h3 className="text-sm font-medium text-gray-900 mb-1">
+        No results found
+      </h3>
+      <p className="text-sm text-gray-500">{message}</p>
+    </div>
+  );
+
+  // Update the validateForm function to only set errors
+  const validateForm = () => {
+    const newErrors = {};
+    if (!newMemo.date) newErrors.date = "Date is required";
+    if (!newMemo.customerName)
+      newErrors.customerName = "Customer name is required";
+    if (!newMemo.customerPhone)
+      newErrors.customerPhone = "Customer phone is required";
+    if (!newMemo.memoNumber.trim())
+      newErrors.memoNumber = "Memo number is required";
+    if (newMemo.products.length === 0)
+      newErrors.products = "Please add at least one product";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Add useEffect to check form validity when dependencies change
+  useEffect(() => {
+    const isFormValid =
+      !newMemo.date ||
+      !newMemo.customerName ||
+      !newMemo.customerPhone ||
+      !newMemo.memoNumber.trim() ||
+      newMemo.products.length === 0;
+
+    setIsValid(!isFormValid);
+  }, [newMemo]);
+
+  // Update the handleSubmit function
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      await addMemo();
+      toast.success("Memo added successfully");
+    } catch (error) {
+      toast.error("Failed to add memo");
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setNewMemo({
+      date: new Date().toDateString(),
+      customerName: "",
+      customerPhone: "",
+      customerAddress: "",
+      memoNumber: "",
+      products: [],
+      totalBill: 0,
+      paymentAmount: 0,
+      credit: 0,
+      customMemo: "",
+    });
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6 text-center">Memo Management</h1>
@@ -482,17 +618,42 @@ export default function MemosPage() {
               className="w-full p-2 border rounded"
             />
           </div>
-          <div>
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={newMemo.date}
-              onChange={(e) =>
-                setNewMemo((prev) => ({ ...prev, date: e.target.value }))
-              }
-              className="w-full p-2 border rounded"
-            />
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !newMemo.date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {newMemo.date ? (
+                    new Date(Date.parse(newMemo.date)).toDateString()
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={new Date(Date.parse(newMemo.date))}
+                  defaultMonth={new Date()}
+                  onSelect={(date) =>
+                    setNewMemo({
+                      ...newMemo,
+                      date: date
+                        ? date.toDateString()
+                        : new Date().toDateString(),
+                    })
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
@@ -509,7 +670,7 @@ export default function MemosPage() {
               <SelectContent>
                 {products.map((product) => (
                   <SelectItem key={product.id} value={product.id}>
-                    {product.name} (${product.price})
+                    {product.name} (৳{product.price})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -557,15 +718,52 @@ export default function MemosPage() {
                 <TableHead>Quantity</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Subtotal</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {newMemo.products.map((product, index) => (
-                <TableRow key={index}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.quantity}</TableCell>
-                  <TableCell>${product.price}</TableCell>
-                  <TableCell>${product.subtotal}</TableCell>
+                <TableRow
+                  key={index}
+                  className="transition-colors hover:bg-gray-50 group"
+                >
+                  <TableCell className="group-hover:bg-gray-50">
+                    {product.name}
+                  </TableCell>
+                  <TableCell className="group-hover:bg-gray-50">
+                    {product.quantity}
+                  </TableCell>
+                  <TableCell className="group-hover:bg-gray-50">
+                    ৳{product.price.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="group-hover:bg-gray-50">
+                    {product.quantity * product.price}
+                  </TableCell>
+                  <TableCell className="group-hover:bg-gray-50">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleEditProduct(index)}
+                          className="cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteProduct(index)}
+                          className="cursor-pointer text-red-600"
+                        >
+                          <DeleteIcon className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -600,10 +798,23 @@ export default function MemosPage() {
         </div>
 
         <Button
-          onClick={addMemo}
-          className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white"
+          onClick={handleSubmit}
+          disabled={isSubmitting || !isValid}
+          className={cn(
+            "w-full mt-4",
+            "transition-all duration-200",
+            isSubmitting && "opacity-70 cursor-not-allowed",
+            !isValid && "opacity-50 cursor-not-allowed"
+          )}
         >
-          Save Memo
+          {isSubmitting ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Processing...
+            </div>
+          ) : (
+            "Save Memo"
+          )}
         </Button>
       </div>
 
@@ -690,68 +901,117 @@ export default function MemosPage() {
         </div>
 
         {/* Memos Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Memo #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentMemos.map((memo) => (
-                <TableRow key={memo.id} className="hover:bg-gray-50">
-                  <TableCell>{memo.date}</TableCell>
-                  <TableCell className="font-medium">
-                    {memo.memoNumber || memo.id.slice(0, 8).toUpperCase()}
-                  </TableCell>
-                  <TableCell>{memo.customerName}</TableCell>
-                  <TableCell>{memo.customerPhone}</TableCell>
-                  <TableCell className="text-right">
-                    ৳{memo.totalBill.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    ৳{memo.paymentAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={
-                        memo.credit > 0 ? "text-red-600" : "text-green-600"
-                      }
+        <div className="overflow-x-auto -mx-6">
+          <div className="inline-block min-w-full align-middle px-6">
+            {currentMemos.length === 0 ? (
+              <EmptyState message="No transactions found matching your filters." />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead>Date</TableHead>
+                    <TableHead>Memo #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Credit</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentMemos.map((memo) => (
+                    <TableRow
+                      key={memo.id}
+                      className="transition-colors hover:bg-gray-50 group"
                     >
-                      ৳{memo.credit.toFixed(2)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        // Implement edit functionality
-                      }}
-                    >
-                      <EditIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        // Implement delete functionality
-                      }}
-                    >
-                      <DeleteIcon className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                      <TableCell className="group-hover:bg-gray-50">
+                        {memo.date === new Date().toDateString() ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-blue-600">
+                              Today
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(entry.createdAt).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {new Date(
+                                Date.parse(memo.createdAt)
+                              ).toDateString()}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(memo.createdAt).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50">
+                        {memo.memoNumber || memo.id.slice(0, 8).toUpperCase()}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50">
+                        {memo.customerName}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50">
+                        {memo.customerPhone}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50 text-right">
+                        ৳{memo.totalBill.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50 text-right">
+                        ৳{memo.paymentAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50 text-right">
+                        <span
+                          className={
+                            memo.credit > 0 ? "text-red-600" : "text-green-600"
+                          }
+                        >
+                          ৳{memo.credit.toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="group-hover:bg-gray-50">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            // Implement edit functionality
+                          }}
+                        >
+                          <EditIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            // Implement delete functionality
+                          }}
+                        >
+                          <DeleteIcon className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </div>
 
         {/* Pagination Controls */}
