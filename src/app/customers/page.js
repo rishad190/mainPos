@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db, auth } from "@/lib/firebase";
 import {
   ref,
@@ -12,6 +12,7 @@ import {
   orderByChild,
   startAt,
   endAt,
+  equalTo,
 } from "firebase/database";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -222,15 +223,17 @@ export default function CustomersPage() {
       customer.phone.includes(searchTerm)
   );
 
-  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
-    if (a[sortConfig.key] < b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? -1 : 1;
-    }
-    if (a[sortConfig.key] > b[sortConfig.key]) {
-      return sortConfig.direction === "asc" ? 1 : -1;
-    }
-    return 0;
-  });
+  const sortedCustomers = useMemo(() => {
+    return [...filteredCustomers].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === "asc" ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === "asc" ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [filteredCustomers, sortConfig]);
 
   const requestSort = (key) => {
     let direction = "asc";

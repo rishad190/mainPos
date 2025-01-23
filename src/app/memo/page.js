@@ -73,6 +73,7 @@ export default function MemosPage() {
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [productQuantity, setProductQuantity] = useState(1);
+
   const [newMemo, setNewMemo] = useState({
     date: new Date().toDateString(),
     customerName: "",
@@ -527,6 +528,11 @@ export default function MemosPage() {
 
   // Update the handleSubmit function
   const handleSubmit = async () => {
+    const validation = memoSchema.safeParse(newMemo);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
     if (!validateForm()) return;
 
     setIsSubmitting(true);

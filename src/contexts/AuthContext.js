@@ -19,7 +19,12 @@ export function AuthProvider({ children }) {
         if (user) {
           const token = await user.getIdToken();
           setUser(user);
-          Cookies.set("session", token, { expires: 7 });
+          // AuthContext.js - Cookie Security
+          Cookies.set("session", token, {
+            expires: 7,
+            secure: process.env.NODE_ENV === "production", // Add
+            sameSite: "strict", // Add
+          });
         } else {
           setUser(null);
           Cookies.remove("session");

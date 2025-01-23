@@ -289,6 +289,7 @@ export default function StockPage() {
                       <DropdownMenuItem
                         onClick={() => handleDelete(product.id)}
                         className="cursor-pointer text-red-600"
+                        aria-label={`Delete ${product.name}`}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
